@@ -223,7 +223,7 @@ function normalizeHeaders(
     return Object.fromEntries(headers);
   }
 
-  return { ...headers };
+  return headers as Record<string, string>;
 }
 
 function safeUsername(): string {
@@ -394,7 +394,7 @@ function getS3Config(): S3Config | null {
   return {
     bucket,
     prefix: process.env['QWEN_CODE_LOGS_S3_PREFIX'] ?? '',
-    region: process.env['QWEN_CODE_LOGS_S3_REGION'] ?? DEFAULT_S3_REGION,
+    region: process.env['AWS_DEFAULT_REGION'] ?? DEFAULT_S3_REGION,
   };
 }
 

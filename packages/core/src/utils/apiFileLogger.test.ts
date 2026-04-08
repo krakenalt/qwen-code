@@ -17,7 +17,7 @@ describe('ApiFileLogger', () => {
     testDir = path.join(os.tmpdir(), `qwen-api-file-logger-${Date.now()}`);
     delete process.env['QWEN_CODE_LOGS_S3_BUCKET'];
     delete process.env['QWEN_CODE_LOGS_S3_PREFIX'];
-    delete process.env['QWEN_CODE_LOGS_S3_REGION'];
+    delete process.env['AWS_DEFAULT_REGION'];
     delete process.env['AWS_ACCESS_KEY_ID'];
     delete process.env['AWS_SECRET_ACCESS_KEY'];
     delete process.env['AWS_ENDPOINT_URL'];
