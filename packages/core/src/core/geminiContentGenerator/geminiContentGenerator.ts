@@ -166,6 +166,17 @@ export class GeminiContentGenerator implements ContentGenerator {
     return this.googleGenAI.models.generateContentStream(finalRequest);
   }
 
+  async buildTelemetryRequest(
+    request: GenerateContentParameters,
+    _userPromptId?: string,
+  ): Promise<unknown> {
+    return {
+      ...request,
+      contents: this.stripUnsupportedFields(request.contents),
+      config: this.buildGenerateContentConfig(request),
+    };
+  }
+
   /**
    * Strip fields not supported by Gemini API (e.g., displayName in inlineData/fileData)
    */

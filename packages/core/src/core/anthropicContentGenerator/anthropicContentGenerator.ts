@@ -119,6 +119,23 @@ export class AnthropicContentGenerator implements ContentGenerator {
     return this.processStream(stream);
   }
 
+  async buildTelemetryRequest(
+    request: GenerateContentParameters,
+    _userPromptId?: string,
+    streaming: boolean = false,
+  ): Promise<unknown> {
+    const anthropicRequest = await this.buildRequest(request);
+
+    if (!streaming) {
+      return anthropicRequest;
+    }
+
+    return {
+      ...anthropicRequest,
+      stream: true,
+    };
+  }
+
   async countTokens(
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {

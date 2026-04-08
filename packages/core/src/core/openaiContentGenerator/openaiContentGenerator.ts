@@ -79,6 +79,18 @@ export class OpenAIContentGenerator implements ContentGenerator {
     return this.pipeline.executeStream(request, userPromptId);
   }
 
+  async buildTelemetryRequest(
+    request: GenerateContentParameters,
+    userPromptId: string,
+    streaming: boolean = false,
+  ): Promise<unknown> {
+    return this.pipeline.buildTelemetryRequest(
+      request,
+      userPromptId,
+      streaming,
+    );
+  }
+
   async countTokens(
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {

@@ -50,6 +50,17 @@ export class ContentGenerationPipeline {
     );
   }
 
+  async buildTelemetryRequest(
+    request: GenerateContentParameters,
+    userPromptId: string,
+    streaming: boolean = false,
+  ): Promise<OpenAI.Chat.ChatCompletionCreateParams> {
+    const effectiveModel = this.contentGeneratorConfig.model;
+    this.converter.setModel(effectiveModel);
+    this.converter.setModalities(this.contentGeneratorConfig.modalities ?? {});
+    return this.buildRequest(request, userPromptId, streaming, effectiveModel);
+  }
+
   async execute(
     request: GenerateContentParameters,
     userPromptId: string,

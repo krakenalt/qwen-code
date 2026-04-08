@@ -39,15 +39,28 @@ import type {
 import { OpenAIContentConverter } from '../openaiContentGenerator/converter.js';
 import { OpenAILogger } from '../../utils/openaiLogger.js';
 import {
+  ApiFileLogger,
+  type ApiFileLogContext,
+} from '../../utils/apiFileLogger.js';
+import {
   getErrorMessage,
   getErrorStatus,
   getErrorType,
 } from '../../utils/errors.js';
 
+type TelemetryRequestInspectable = {
+  buildTelemetryRequest?: (
+    request: GenerateContentParameters,
+    userPromptId: string,
+    streaming?: boolean,
+  ) => Promise<unknown>;
+};
+
 /**
  * A decorator that wraps a ContentGenerator to add logging to API calls.
  */
 export class LoggingContentGenerator implements ContentGenerator {
+  private apiFileLogger?: ApiFileLogger;
   private openaiLogger?: OpenAILogger;
   private schemaCompliance?: 'auto' | 'openapi_30';
   private modalities?: InputModalities;
@@ -58,6 +71,14 @@ export class LoggingContentGenerator implements ContentGenerator {
     generatorConfig: ContentGeneratorConfig,
   ) {
     this.modalities = generatorConfig.modalities;
+
+    if (config.getTelemetryEnabled()) {
+      this.apiFileLogger = new ApiFileLogger({
+        sessionId: config.getSessionId(),
+        cwd: config.getWorkingDir(),
+        source: config.getAuthType() ?? generatorConfig.authType ?? 'unknown',
+      });
+    }
 
     // Extract fields needed for initialization from passed config
     // (config.getContentGeneratorConfig() may not be available yet during refreshAuth)
@@ -143,6 +164,11 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const startTime = Date.now();
+    const fileLogContext = await this.logApiFileRequest(
+      req,
+      userPromptId,
+      false,
+    );
     this.logApiRequest(this.toContents(req.contents), req.model, userPromptId);
     const openaiRequest = await this.buildOpenAIRequestForLogging(req);
     try {
@@ -155,6 +181,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         userPromptId,
         response.usageMetadata,
       );
+      this.apiFileLogger?.logResponse(fileLogContext, response);
       await this.logOpenAIInteraction(openaiRequest, response);
       return response;
     } catch (error) {
@@ -170,6 +197,11 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const startTime = Date.now();
+    const fileLogContext = await this.logApiFileRequest(
+      req,
+      userPromptId,
+      true,
+    );
     this.logApiRequest(this.toContents(req.contents), req.model, userPromptId);
     const openaiRequest = await this.buildOpenAIRequestForLogging(req);
 
@@ -189,6 +221,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       userPromptId,
       req.model,
       openaiRequest,
+      fileLogContext,
     );
   }
 
@@ -198,6 +231,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
     model: string,
     openaiRequest?: OpenAI.Chat.ChatCompletionCreateParams,
+    fileLogContext?: ApiFileLogContext,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
@@ -221,6 +255,9 @@ export class LoggingContentGenerator implements ContentGenerator {
       );
       const consolidatedResponse =
         this.consolidateGeminiResponsesForLogging(responses);
+      if (consolidatedResponse) {
+        this.apiFileLogger?.logResponse(fileLogContext, consolidatedResponse);
+      }
       await this.logOpenAIInteraction(openaiRequest, consolidatedResponse);
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -280,6 +317,52 @@ export class LoggingContentGenerator implements ContentGenerator {
     }
 
     return openaiRequest;
+  }
+
+  private async logApiFileRequest(
+    request: GenerateContentParameters,
+    userPromptId: string,
+    streaming: boolean,
+  ): Promise<ApiFileLogContext | undefined> {
+    if (!this.apiFileLogger) {
+      return undefined;
+    }
+
+    try {
+      const requestBody = await this.buildTelemetryRequestBody(
+        request,
+        userPromptId,
+        streaming,
+      );
+
+      return this.apiFileLogger.logRequest(requestBody, {
+        source: this.config.getAuthType() ?? request.model ?? 'unknown',
+      });
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async buildTelemetryRequestBody(
+    request: GenerateContentParameters,
+    userPromptId: string,
+    streaming: boolean,
+  ): Promise<unknown> {
+    const wrapped = this.wrapped as TelemetryRequestInspectable;
+    if (typeof wrapped.buildTelemetryRequest === 'function') {
+      return wrapped.buildTelemetryRequest.call(
+        this.wrapped,
+        request,
+        userPromptId,
+        streaming,
+      );
+    }
+
+    return {
+      ...request,
+      contents: this.toContents(request.contents),
+      ...(streaming ? { stream: true } : {}),
+    };
   }
 
   private async logOpenAIInteraction(

@@ -47,10 +47,6 @@ observability framework — Qwen Code's observability system provides:
 
 ## Configuration
 
-> [!note]
->
-> **⚠️ Special Note: This feature requires corresponding code changes. This documentation is provided in advance; please refer to future code updates for actual functionality.**
-
 All telemetry behavior is controlled through your `.qwen/settings.json` file.
 These settings can be overridden by environment variables or CLI flags.
 
@@ -107,7 +103,35 @@ For local development and debugging, you can capture telemetry data locally:
    }
    ```
 2. Run Qwen Code and send prompts.
-3. View logs and metrics in the specified file (e.g., `.qwen/telemetry.log`).
+3. View OTEL logs and metrics in the specified file (e.g., `.qwen/telemetry.log`).
+
+In addition to OTEL output, `telemetry.enabled=true` also writes request/response
+artifacts to `.qwen-code-logs/<session-id>/` in the workspace. Each session directory contains:
+
+- `README.md` with session metadata and appended user prompts
+- `<logId>_request.json` with the request payload
+- `<logId>_response.json` with the response payload
+
+These workspace logs are written on a best-effort basis and never block the main CLI flow.
+
+#### Optional S3 Mirror
+
+If you want the same request/response artifacts mirrored to S3-compatible storage,
+set the following environment variables before running Qwen Code:
+
+- `QWEN_CODE_LOGS_S3_BUCKET`
+- `QWEN_CODE_LOGS_S3_PREFIX` (optional)
+- `QWEN_CODE_LOGS_S3_REGION` (optional, defaults to `ru-central-1`)
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (optional if your AWS credential chain already works)
+- `AWS_ENDPOINT_URL` (optional, useful for MinIO and other S3-compatible endpoints)
+
+The mirror key layout is:
+
+```text
+<prefix>/<YYYY-MM>-<username>/<session-id>/<filename>
+```
+
+Uploads are best-effort and failures are intentionally ignored so telemetry never interrupts model requests.
 
 ### Collector-Based Export (Advanced)
 

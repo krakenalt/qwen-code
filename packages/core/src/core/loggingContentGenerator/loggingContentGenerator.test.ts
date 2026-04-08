@@ -21,6 +21,7 @@ import {
   logApiError,
 } from '../../telemetry/loggers.js';
 import { OpenAILogger } from '../../utils/openaiLogger.js';
+import { ApiFileLogger } from '../../utils/apiFileLogger.js';
 import type OpenAI from 'openai';
 
 vi.mock('../../telemetry/loggers.js', () => ({
@@ -32,6 +33,17 @@ vi.mock('../../telemetry/loggers.js', () => ({
 vi.mock('../../utils/openaiLogger.js', () => ({
   OpenAILogger: vi.fn().mockImplementation(() => ({
     logInteraction: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+vi.mock('../../utils/apiFileLogger.js', () => ({
+  ApiFileLogger: vi.fn().mockImplementation(() => ({
+    logRequest: vi.fn().mockReturnValue({
+      sessionId: 'test-session-id',
+      logDir: '/tmp/test-session-id',
+      logId: 'log-1',
+    }),
+    logResponse: vi.fn(),
   })),
 }));
 
@@ -61,13 +73,17 @@ const createConfig = (overrides: Record<string, unknown> = {}): Config => {
   const configContent = {
     authType: 'openai',
     enableOpenAILogging: false,
+    telemetryEnabled: false,
+    sessionId: 'test-session-id',
     ...overrides,
   };
   return {
     getContentGeneratorConfig: () => configContent,
     getAuthType: () => configContent.authType as AuthType | undefined,
+    getTelemetryEnabled: () => configContent.telemetryEnabled as boolean,
+    getSessionId: () => configContent.sessionId as string,
     getWorkingDir: () => process.cwd(),
-  } as Config;
+  } as unknown as Config;
 };
 
 const createWrappedGenerator = (
@@ -473,5 +489,66 @@ describe('LoggingContentGenerator', () => {
         ],
       },
     ]);
+  });
+
+  it('writes file telemetry request and response logs when telemetry is enabled', async () => {
+    const wrapped = createWrappedGenerator(
+      vi
+        .fn()
+        .mockResolvedValue(
+          createResponse('resp-6', 'test-model', [{ text: 'ok' }]),
+        ),
+      vi.fn(),
+    );
+    (
+      wrapped as ContentGenerator & {
+        buildTelemetryRequest: ReturnType<typeof vi.fn>;
+      }
+    ).buildTelemetryRequest = vi.fn().mockResolvedValue({
+      model: 'test-model',
+      messages: [{ role: 'user', content: 'converted' }],
+    });
+    const generator = new LoggingContentGenerator(
+      wrapped,
+      createConfig({ telemetryEnabled: true }),
+      {
+        model: 'test-model',
+        authType: AuthType.USE_OPENAI,
+      },
+    );
+
+    await generator.generateContent(
+      {
+        model: 'test-model',
+        contents: 'Hello telemetry',
+      } as unknown as GenerateContentParameters,
+      'prompt-6',
+    );
+
+    expect(ApiFileLogger).toHaveBeenCalledTimes(1);
+    const apiFileLoggerInstance = vi.mocked(ApiFileLogger).mock.results[0]
+      ?.value as {
+      logRequest: ReturnType<typeof vi.fn>;
+      logResponse: ReturnType<typeof vi.fn>;
+    };
+
+    expect(apiFileLoggerInstance.logRequest).toHaveBeenCalledTimes(1);
+    const [requestBody, requestMetadata] =
+      apiFileLoggerInstance.logRequest.mock.calls[0];
+    expect(requestBody).toEqual(
+      expect.objectContaining({
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'converted' }],
+      }),
+    );
+    expect(requestMetadata).toEqual({ source: 'openai' });
+
+    expect(apiFileLoggerInstance.logResponse).toHaveBeenCalledTimes(1);
+    const [, responseBody] = apiFileLoggerInstance.logResponse.mock.calls[0];
+    expect(responseBody).toEqual(
+      expect.objectContaining({
+        responseId: 'resp-6',
+      }),
+    );
   });
 });
