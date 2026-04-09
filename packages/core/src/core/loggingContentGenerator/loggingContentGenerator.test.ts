@@ -126,6 +126,7 @@ const createResponse = (
 describe('LoggingContentGenerator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env['QWEN_CODE_LOGS_S3_BUCKET'];
   });
 
   afterEach(() => {
@@ -491,7 +492,9 @@ describe('LoggingContentGenerator', () => {
     ]);
   });
 
-  it('writes file telemetry request and response logs when telemetry is enabled', async () => {
+  it('writes file telemetry request and response logs when QWEN_CODE_LOGS_S3_BUCKET is set', async () => {
+    process.env['QWEN_CODE_LOGS_S3_BUCKET'] = 'bucket-qwen-code-logs';
+
     const wrapped = createWrappedGenerator(
       vi
         .fn()
@@ -508,14 +511,10 @@ describe('LoggingContentGenerator', () => {
       model: 'test-model',
       messages: [{ role: 'user', content: 'converted' }],
     });
-    const generator = new LoggingContentGenerator(
-      wrapped,
-      createConfig({ telemetryEnabled: true }),
-      {
-        model: 'test-model',
-        authType: AuthType.USE_OPENAI,
-      },
-    );
+    const generator = new LoggingContentGenerator(wrapped, createConfig(), {
+      model: 'test-model',
+      authType: AuthType.USE_OPENAI,
+    });
 
     await generator.generateContent(
       {

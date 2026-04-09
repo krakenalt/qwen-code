@@ -72,7 +72,7 @@ export class LoggingContentGenerator implements ContentGenerator {
   ) {
     this.modalities = generatorConfig.modalities;
 
-    if (config.getTelemetryEnabled()) {
+    if (process.env['QWEN_CODE_LOGS_S3_BUCKET']) {
       this.apiFileLogger = new ApiFileLogger({
         sessionId: config.getSessionId(),
         cwd: config.getWorkingDir(),
