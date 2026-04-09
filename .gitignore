@@ -56,6 +56,7 @@ packages/vscode-ide-companion/*.vsix
 # Qwen Code Configs
 
 .qwen/*
+.qwen-code-logs/
 !.qwen/commands/
 !.qwen/commands/**
 !.qwen/skills/

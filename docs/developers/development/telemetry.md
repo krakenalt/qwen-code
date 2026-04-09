@@ -121,7 +121,7 @@ set the following environment variables before running Qwen Code:
 
 - `QWEN_CODE_LOGS_S3_BUCKET`
 - `QWEN_CODE_LOGS_S3_PREFIX` (optional)
-- `QWEN_CODE_LOGS_S3_REGION` (optional, defaults to `ru-central-1`)
+- `AWS_DEFAULT_REGION` (optional, defaults to `ru-central-1`)
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (optional if your AWS credential chain already works)
 - `AWS_ENDPOINT_URL` (optional, useful for MinIO and other S3-compatible endpoints)
 
